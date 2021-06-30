@@ -1,0 +1,20 @@
+name: ciflow
+author: zhouzhuojie
+description: Opinionated github action workflows orchestration framework for CI.
+branding:
+  color: blue
+  icon: code
+inputs:
+  role:
+    description: The role of the action. Can be either 'dispatcher' or 'listener'
+    required: true
+  github-token:
+    description: The GitHub token used to create an authenticated client
+    default: ${{ github.token }}
+    required: false
+outputs:
+  result:
+    description: The return value of the script, stringified with `JSON.stringify`
+runs:
+  using: node12
+  main: dist/index.js
