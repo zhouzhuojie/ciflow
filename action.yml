@@ -7,7 +7,7 @@ branding:
 inputs:
   comment-head:
     description: The ciflow comment head, used for identifying the comment block
-    default: '# 📚 ciflow test plan!'
+    default: '# 📚 CIFlow Test Plan'
     required: true
   comment-body:
     description: The ciflow comment body

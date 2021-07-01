@@ -35,6 +35,8 @@ export class Context {
       this.branch = pr.data.head.ref
       this.commit_sha = pr.data.head.sha
     }
+
+    core.debug(JSON.stringify(this))
   }
 }
 
@@ -119,7 +121,7 @@ export class Comment {
       comment_id: this.id,
       body:
         this.body +
-        '```json\n' +
+        '\n\n```json\n' +
         JSON.stringify(
           {
             label_workflows: this.label_workflows,
