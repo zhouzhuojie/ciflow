@@ -134,6 +134,10 @@ export class Comment {
   }
 
   async find(ctx: Context): Promise<boolean> {
+    if (!ctx.pull_number) {
+      return false
+    }
+
     const parameters = {
       owner: ctx.owner,
       repo: ctx.repo,
@@ -158,6 +162,10 @@ export class Comment {
   }
 
   async create(ctx: Context): Promise<void> {
+    if (!ctx.pull_number) {
+      return
+    }
+
     ctx.github.issues.createComment({
       owner: ctx.owner,
       repo: ctx.repo,
@@ -213,7 +221,6 @@ export class CIFlow {
       }
       default: {
         throw new Error(`unsupported strategy: ${this.ctx.strategy}`)
-        break
       }
     }
   }
