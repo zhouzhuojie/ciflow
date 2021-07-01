@@ -5,9 +5,33 @@ branding:
   color: blue
   icon: code
 inputs:
-  role:
-    description: The role of the action. Can be either 'dispatcher' or 'listener'
+  comment-head:
+    description: The ciflow comment head, used for identifying the comment block
+    default: '# 📚 ciflow test plan!'
     required: true
+  comment-body:
+    description: The ciflow comment body
+    default: |
+      - [x] ci/default
+        - ciflow_lint.yml
+        - ciflow_linux.yml
+        - ciflow_windows.yml
+        - ciflow_mac.yml
+      - [ ] ci/extra
+        - ciflow_linux_extra.yml
+        - ciflow_windows_extra.yml
+        - ciflow_mac_extra.yml
+      - [ ] ci/cuda
+        - ciflow_windows_cuda.yml
+    required: true
+  strategy:
+    description: The dispatcher strategy.
+    default: comment
+    required: false
+  repository:
+    description: The GitHub repository, e.g. 'pytorch/pytorch'
+    default: ${{ github.repository }}
+    required: false
   github-token:
     description: The GitHub token used to create an authenticated client
     default: ${{ github.token }}

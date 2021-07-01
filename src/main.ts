@@ -1,48 +1,11 @@
 import * as core from '@actions/core'
-import {context, getOctokit} from '@actions/github'
-import * as glob from '@actions/glob'
-import * as io from '@actions/io'
-import {callAsyncFunction} from './async-function'
-import {wrapRequire} from './wrap-require'
+import {CIFlow} from './ciflow'
 
 process.on('unhandledRejection', handleError)
 main().catch(handleError)
 
-type Options = {
-  log?: Console
-  userAgent?: string
-  previews?: string[]
-}
-
 async function main(): Promise<void> {
-  const token = core.getInput('github-token', {required: true})
-  const debug = core.getInput('debug')
-  const userAgent = core.getInput('user-agent')
-  const previews = core.getInput('previews')
-
-  const opts: Options = {}
-  if (debug === 'true') opts.log = console
-  if (userAgent != null) opts.userAgent = userAgent
-  if (previews != null) opts.previews = previews.split(',')
-
-  const github = getOctokit(token, opts)
-  const script = core.getInput('script', {required: true})
-
-  // Using property/value shorthand on `require` (e.g. `{require}`) causes compilation errors.
-  const result = await callAsyncFunction(
-    {
-      require: wrapRequire,
-      __original_require__: __non_webpack_require__,
-      github,
-      context,
-      core,
-      glob,
-      io
-    },
-    script
-  )
-
-  core.setOutput('result', JSON.stringify(result))
+  new CIFlow().main()
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
