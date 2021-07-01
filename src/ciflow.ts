@@ -27,6 +27,7 @@ export class Context {
     // only populate pull_request related
     if (context.payload.issue) {
       this.pull_number = context.payload.issue.number
+      console.log(context.payload)
       const pr = await this.github.pulls.get({
         owner: this.owner,
         repo: this.repo,
