@@ -13,6 +13,7 @@ export class Context {
   public pull_number = 0
   public commit_sha = ''
   public strategy = ''
+  public actor = ''
 
   async populate(): Promise<void> {
     this.repository = core.getInput('repository', {required: true})
@@ -23,6 +24,7 @@ export class Context {
     this.comment_head = core.getInput('comment-head', {required: true})
     this.comment_body = core.getInput('comment-body', {required: true})
     this.strategy = core.getInput('strategy')
+    this.actor = context.actor
 
     // only populate pull_request related
     if (context.payload.issue) {
@@ -121,17 +123,19 @@ export class Comment {
       comment_id: this.id,
       body:
         this.body +
-        '\n\n```json\n' +
+        '\n----\n' +
+        '```json\n' +
         JSON.stringify(
           {
+            actor: ctx.actor,
+            timestamp: new Date(),
             label_workflows: this.label_workflows,
             rerun_workflows: this.rerun_workflows
           },
           null,
           2
         ) +
-        '```\n' +
-        '----\n'
+        '\n```\n'
     })
   }
 
