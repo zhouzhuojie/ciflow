@@ -24,17 +24,17 @@ export class Context {
     this.comment_body = core.getInput('comment-body', {required: true})
     this.strategy = core.getInput('strategy')
 
+    // only populate pull_request related
     if (context.payload.issue) {
       this.pull_number = context.payload.issue.number
+      const pr = await this.github.pulls.get({
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: this.pull_number
+      })
+      this.branch = pr.data.head.ref
+      this.commit_sha = pr.data.head.sha
     }
-
-    const pr = await this.github.pulls.get({
-      owner: this.owner,
-      repo: this.repo,
-      pull_number: this.pull_number
-    })
-    this.branch = pr.data.head.ref
-    this.commit_sha = pr.data.head.sha
   }
 }
 
