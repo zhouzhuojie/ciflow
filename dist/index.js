@@ -5963,6 +5963,7 @@ class ciflow_Context {
         this.pull_number = 0;
         this.commit_sha = '';
         this.strategy = '';
+        this.actor = '';
     }
     async populate() {
         this.repository = Object(core.getInput)('repository', { required: true });
@@ -5973,6 +5974,7 @@ class ciflow_Context {
         this.comment_head = Object(core.getInput)('comment-head', { required: true });
         this.comment_body = Object(core.getInput)('comment-body', { required: true });
         this.strategy = Object(core.getInput)('strategy');
+        this.actor = github.context.actor;
         // only populate pull_request related
         if (github.context.payload.issue) {
             this.pull_number = github.context.payload.issue.number;
@@ -5984,6 +5986,7 @@ class ciflow_Context {
             this.branch = pr.data.head.ref;
             this.commit_sha = pr.data.head.sha;
         }
+        Object(core.debug)(JSON.stringify(this));
     }
 }
 class Workflow {
@@ -6065,13 +6068,15 @@ class Comment {
             repo: ctx.repo,
             comment_id: this.id,
             body: this.body +
+                '\n----\n' +
                 '```json\n' +
                 JSON.stringify({
+                    actor: ctx.actor,
+                    timestamp: new Date(),
                     label_workflows: this.label_workflows,
                     rerun_workflows: this.rerun_workflows
                 }, null, 2) +
-                '```\n' +
-                '----\n'
+                '\n```\n'
         });
     }
     async find(ctx) {
