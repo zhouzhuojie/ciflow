@@ -5951,19 +5951,39 @@ var github = __webpack_require__(438);
 // CONCATENATED MODULE: ./src/ciflow.ts
 
 
-const token = Object(core.getInput)('github-token', { required: true });
-const repository = Object(core.getInput)('repository');
-const comment_head = Object(core.getInput)('comment-head', { required: true });
-const comment_body = Object(core.getInput)('comment-body', { required: true });
-const strategy = Object(core.getInput)('strategy');
-const [owner, repo] = repository.split('/');
-const ciflow_github = Object(github.getOctokit)(token);
 // Context is the context to determine which workflows to dispatch
-class Context {
-    constructor(branch = '', pull_number = 0, commit_sha = '') {
-        this.branch = branch;
-        this.pull_number = pull_number;
-        this.commit_sha = commit_sha;
+class ciflow_Context {
+    constructor() {
+        this.repository = '';
+        this.owner = '';
+        this.repo = '';
+        this.comment_head = '';
+        this.comment_body = '';
+        this.branch = '';
+        this.pull_number = 0;
+        this.commit_sha = '';
+        this.strategy = '';
+    }
+    async populate() {
+        this.repository = Object(core.getInput)('repository', { required: true });
+        const [owner, repo] = this.repository.split('/');
+        this.owner = owner;
+        this.repo = repo;
+        this.github = Object(github.getOctokit)(Object(core.getInput)('github-token', { required: true }));
+        this.comment_head = Object(core.getInput)('comment-head', { required: true });
+        this.comment_body = Object(core.getInput)('comment-body', { required: true });
+        this.strategy = Object(core.getInput)('strategy');
+        // only populate pull_request related
+        if (github.context.payload.issue) {
+            this.pull_number = github.context.payload.issue.number;
+            const pr = await this.github.pulls.get({
+                owner: this.owner,
+                repo: this.repo,
+                pull_number: this.pull_number
+            });
+            this.branch = pr.data.head.ref;
+            this.commit_sha = pr.data.head.sha;
+        }
     }
 }
 class Workflow {
@@ -5971,9 +5991,10 @@ class Workflow {
         this.workflow_id = workflow_id;
     }
     async rerun(ctx) {
-        const runs = await ciflow_github.actions.listWorkflowRuns({
-            owner,
-            repo,
+        var _a;
+        const runs = await ctx.github.actions.listWorkflowRuns({
+            owner: ctx.owner,
+            repo: ctx.repo,
             branch: ctx.branch,
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-expect-error workflow_id can be a string from github rest api
@@ -5981,12 +6002,12 @@ class Workflow {
         });
         // if we found exisiting running workflow, only rerun after checking the
         // the status of it
-        if (runs.data && runs.data.workflow_runs.length != 0) {
-            const lastRun = runs.data.workflow_runs[0];
-            if (lastRun.conclusion == 'skipped') {
-                ciflow_github.actions.reRunWorkflow({
-                    owner,
-                    repo,
+        if (((_a = runs === null || runs === void 0 ? void 0 : runs.data) === null || _a === void 0 ? void 0 : _a.workflow_runs.length) != 0) {
+            const lastRun = runs === null || runs === void 0 ? void 0 : runs.data.workflow_runs[0];
+            if ((lastRun === null || lastRun === void 0 ? void 0 : lastRun.conclusion) == 'skipped') {
+                ctx.github.actions.reRunWorkflow({
+                    owner: ctx.owner,
+                    repo: ctx.repo,
                     run_id: lastRun.id
                 });
                 return true;
@@ -6038,10 +6059,10 @@ class Comment {
         }
         this.label_workflows = label_workflows;
     }
-    async update() {
-        ciflow_github.issues.updateComment({
-            owner,
-            repo,
+    async update(ctx) {
+        ctx.github.issues.updateComment({
+            owner: ctx.owner,
+            repo: ctx.repo,
             comment_id: this.id,
             body: this.body +
                 '```json\n' +
@@ -6054,15 +6075,18 @@ class Comment {
         });
     }
     async find(ctx) {
+        if (!ctx.pull_number) {
+            return false;
+        }
         const parameters = {
-            owner,
-            repo,
+            owner: ctx.owner,
+            repo: ctx.repo,
             issue_number: ctx.pull_number
         };
-        for await (const { data: comments } of ciflow_github.paginate.iterator(ciflow_github.issues.listComments, parameters)) {
+        for await (const { data: comments } of ctx.github.paginate.iterator(ctx.github.issues.listComments, parameters)) {
             // Search each page for the comment
             const comment = comments.find(comment => {
-                return comment.body.includes(comment_head);
+                return comment.body.includes(ctx.comment_head);
             });
             if (comment) {
                 this.id = comment.id;
@@ -6073,18 +6097,21 @@ class Comment {
         return false;
     }
     async create(ctx) {
-        ciflow_github.issues.createComment({
-            owner,
-            repo,
+        if (!ctx.pull_number) {
+            return;
+        }
+        ctx.github.issues.createComment({
+            owner: ctx.owner,
+            repo: ctx.repo,
             issue_number: ctx.pull_number,
-            body: comment_head + '\n' + comment_body
+            body: ctx.comment_head + '\n' + ctx.comment_body
         });
     }
     async dispatch(ctx) {
         this.parse(this.body);
-        await ciflow_github.issues.addLabels({
-            owner,
-            repo,
+        await ctx.github.issues.addLabels({
+            owner: ctx.owner,
+            repo: ctx.repo,
             issue_number: ctx.pull_number,
             labels: [...this.label_workflows.keys()]
         });
@@ -6095,26 +6122,12 @@ class Comment {
                 this.rerun_workflows.push(wf);
             }
         }
-        await this.update();
+        await this.update(ctx);
     }
 }
 class ciflow_CIFlow {
     constructor() {
-        this.ctx = new Context();
-    }
-    async set_context() {
-        const ctx = new Context();
-        if (github.context.payload.issue) {
-            ctx.pull_number = github.context.payload.issue.number;
-        }
-        const pr = await ciflow_github.pulls.get({
-            owner,
-            repo,
-            pull_number: ctx.pull_number
-        });
-        ctx.branch = pr.data.head.ref;
-        ctx.commit_sha = pr.data.head.sha;
-        this.ctx = ctx;
+        this.ctx = new ciflow_Context();
     }
     async dispatch_comment() {
         var _a;
@@ -6130,15 +6143,14 @@ class ciflow_CIFlow {
         comment.dispatch(this.ctx);
     }
     async main() {
-        await this.set_context();
-        switch (strategy) {
+        await this.ctx.populate();
+        switch (this.ctx.strategy) {
             case 'comment': {
                 await this.dispatch_comment();
                 break;
             }
             default: {
-                throw new Error(`unsupported strategy: ${strategy}`);
-                break;
+                throw new Error(`unsupported strategy: ${this.ctx.strategy}`);
             }
         }
     }
