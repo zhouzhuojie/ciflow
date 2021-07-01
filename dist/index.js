@@ -5989,7 +5989,7 @@ class ciflow_Context {
         Object(core.debug)(JSON.stringify(this));
     }
 }
-class Workflow {
+class ciflow_Workflow {
     constructor(workflow_id = '') {
         this.workflow_id = workflow_id;
     }
@@ -6007,6 +6007,7 @@ class Workflow {
         // the status of it
         if (((_a = runs === null || runs === void 0 ? void 0 : runs.data) === null || _a === void 0 ? void 0 : _a.workflow_runs.length) != 0) {
             const lastRun = runs === null || runs === void 0 ? void 0 : runs.data.workflow_runs[0];
+            Object(core.debug)(JSON.stringify(lastRun));
             if ((lastRun === null || lastRun === void 0 ? void 0 : lastRun.conclusion) == 'skipped') {
                 ctx.github.actions.reRunWorkflow({
                     owner: ctx.owner,
@@ -6121,7 +6122,7 @@ class Comment {
             labels: [...this.label_workflows.keys()]
         });
         for (const wf of this.workflows) {
-            const workflow = new Workflow(wf);
+            const workflow = new ciflow_Workflow(wf);
             const rerun = await workflow.rerun(ctx);
             if (rerun) {
                 this.rerun_workflows.push(wf);

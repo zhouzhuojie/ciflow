@@ -59,6 +59,7 @@ export class Workflow {
     // the status of it
     if (runs?.data?.workflow_runs.length != 0) {
       const lastRun = runs?.data.workflow_runs[0]
+      core.debug(JSON.stringify(lastRun))
       if (lastRun?.conclusion == 'skipped') {
         ctx.github.actions.reRunWorkflow({
           owner: ctx.owner,
