@@ -28,6 +28,10 @@ inputs:
     description: The dispatcher strategy.
     default: comment
     required: false
+  role:
+    description: The role of the CIFlow. 'dispatcher' | 'listener'
+    default: dispatcher
+    required: true
   repository:
     description: The GitHub repository, e.g. 'pytorch/pytorch'
     default: ${{ github.repository }}

@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import {Comment} from '../src/ciflow'
+import {Comment, Context} from '../src/ciflow'
 
 describe('Comment', () => {
   test('parse happy path', () => {
+    const ctx = new Context()
     const c = new Comment()
     c.body = `
 # 📚 ciflow test plan!
@@ -20,9 +21,9 @@ describe('Comment', () => {
   - ciflow_windows_cuda.yml
     `
 
-    c.parse(c.body)
-    expect([...c.label_workflows.keys()]).toEqual(['ci/default'])
-    expect(c.workflows).toEqual(
+    c.parse(ctx, c.body)
+    expect([...ctx.plan.label_workflows.keys()]).toEqual(['ci/default'])
+    expect(ctx.plan.workflows).toEqual(
       new Set<string>([
         'ciflow_lint.yml',
         'ciflow_linux.yml',
@@ -34,17 +35,19 @@ describe('Comment', () => {
 
   test('parse empty body', () => {
     const c = new Comment()
+    const ctx = new Context()
     c.body = ''
-    c.parse(c.body)
-    expect([...c.label_workflows.keys()]).toEqual([])
-    expect(c.workflows).toEqual(new Set<string>())
+    c.parse(ctx, c.body)
+    expect([...ctx.plan.label_workflows.keys()]).toEqual([])
+    expect(ctx.plan.workflows).toEqual(new Set<string>())
   })
 
   test('parse empty body with header', () => {
     const c = new Comment()
+    const ctx = new Context()
     c.body = `# 📚 ciflow test plan!\n`
-    c.parse(c.body)
-    expect([...c.label_workflows.keys()]).toEqual([])
-    expect(c.workflows).toEqual(new Set<string>())
+    c.parse(ctx, c.body)
+    expect([...ctx.plan.label_workflows.keys()]).toEqual([])
+    expect(ctx.plan.workflows).toEqual(new Set<string>())
   })
 })

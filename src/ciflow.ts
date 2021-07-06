@@ -2,20 +2,39 @@ import * as core from '@actions/core'
 import {context, getOctokit} from '@actions/github'
 
 // Context is the context to determine which workflows to dispatch
+
+export class Plan {
+  public label_workflows = new Map<string, Array<string>>()
+  public workflows = new Set<string>()
+  public rerun_workflows = new Array<string>()
+  public timestamp = new Date()
+
+  toJSON(): string {
+    return JSON.stringify(this, null, 2)
+  }
+}
 export class Context {
+  private populated = false
+
+  public plan = new Plan()
   public repository = ''
   public owner = ''
   public repo = ''
   public github!: ReturnType<typeof getOctokit>
   public comment_head = ''
   public comment_body = ''
-  public branch = ''
+  public github_head_ref = ''
   public pull_number = 0
-  public commit_sha = ''
+  public github_sha = ''
   public strategy = ''
   public actor = ''
+  public ciflow_role = ''
 
   async populate(): Promise<void> {
+    if (this.populated) {
+      return
+    }
+
     this.repository = core.getInput('repository', {required: true})
     const [owner, repo] = this.repository.split('/')
     this.owner = owner
@@ -25,65 +44,25 @@ export class Context {
     this.comment_body = core.getInput('comment-body', {required: true})
     this.strategy = core.getInput('strategy')
     this.actor = context.actor
+    this.ciflow_role = core.getInput('role', {required: true})
 
     // only populate pull_request related
     if (context.payload.issue) {
       this.pull_number = context.payload.issue.number
-      const pr = await this.github.pulls.get({
-        owner: this.owner,
-        repo: this.repo,
-        pull_number: this.pull_number
-      })
-      this.branch = pr.data.head.ref
-      this.commit_sha = pr.data.head.sha
+      this.github_head_ref = process.env.GITHUB_HEAD_REF || ''
+      this.github_sha = process.env.GITHUB_SHA || ''
     }
 
+    this.populated = true
     core.debug(JSON.stringify(this))
-  }
-}
-
-export class Workflow {
-  constructor(public workflow_id: string = '') {}
-
-  async rerun(ctx: Context): Promise<boolean> {
-    const runs = await ctx.github.actions.listWorkflowRuns({
-      owner: ctx.owner,
-      repo: ctx.repo,
-      branch: ctx.branch,
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-expect-error workflow_id can be a string from github rest api
-      workflow_id: this.workflow_id
-    })
-
-    // if we found exisiting running workflow, only rerun after checking the
-    // the status of it
-    if (runs?.data?.workflow_runs.length != 0) {
-      const lastRun = runs?.data.workflow_runs[0]
-      core.debug(JSON.stringify(lastRun))
-      if (lastRun?.conclusion == 'skipped') {
-        ctx.github.actions.reRunWorkflow({
-          owner: ctx.owner,
-          repo: ctx.repo,
-          run_id: lastRun.id
-        })
-        return true
-      } else {
-        return false
-      }
-    }
-
-    return false
   }
 }
 
 export class Comment {
   id = 0
   body = ''
-  label_workflows = new Map<string, Array<string>>()
-  workflows = new Set<string>()
-  rerun_workflows = new Array<string>()
 
-  parse(body: string): void {
+  parse(ctx: Context, body: string): void {
     const re = new RegExp(/-\s+\[([\s|x])\]\s+(.*)[\r\n]((\s\s-.*yml[\r\n])*)/g)
     let match = re.exec(body)
     const label_workflows = new Map<string, Array<string>>()
@@ -108,13 +87,13 @@ export class Comment {
         }
         for (const wf of w) {
           label_workflows.get(label)?.push(wf)
-          this.workflows.add(wf)
+          ctx.plan.workflows.add(wf)
         }
       }
       match = re.exec(body)
     }
 
-    this.label_workflows = label_workflows
+    ctx.plan.label_workflows = label_workflows
   }
 
   async update(ctx: Context): Promise<void> {
@@ -130,8 +109,8 @@ export class Comment {
           {
             actor: ctx.actor,
             timestamp: new Date(),
-            label_workflows: this.label_workflows,
-            rerun_workflows: this.rerun_workflows
+            label_workflows: ctx.plan.label_workflows,
+            rerun_workflows: ctx.plan.rerun_workflows
           },
           null,
           2
@@ -182,28 +161,33 @@ export class Comment {
   }
 
   async dispatch(ctx: Context): Promise<void> {
-    this.parse(this.body)
+    this.parse(ctx, this.body)
+    const labels = [...ctx.plan.label_workflows.keys()]
 
     await ctx.github.issues.addLabels({
       owner: ctx.owner,
       repo: ctx.repo,
       issue_number: ctx.pull_number,
-      labels: [...this.label_workflows.keys()]
+      labels: labels
     })
 
-    for (const wf of this.workflows) {
-      const workflow = new Workflow(wf)
-      const rerun = await workflow.rerun(ctx)
-      if (rerun) {
-        this.rerun_workflows.push(wf)
-      }
-    }
+    await Promise.all(
+      labels.map(label =>
+        ctx.github.issues.removeLabel({
+          owner: ctx.owner,
+          repo: ctx.repo,
+          issue_number: ctx.pull_number,
+          name: label
+        })
+      )
+    )
+
     await this.update(ctx)
   }
 }
 
-export class CIFlow {
-  ctx: Context = new Context()
+export class CIFlowDispatcher {
+  constructor(public ctx: Context = new Context()) {}
 
   async dispatch_comment(): Promise<void> {
     const comment = new Comment()
@@ -229,6 +213,32 @@ export class CIFlow {
       default: {
         throw new Error(`unsupported strategy: ${this.ctx.strategy}`)
       }
+    }
+  }
+}
+
+export class CIFlowListener {
+  constructor(public ctx: Context = new Context()) {}
+
+  async main(): Promise<void> {
+    await this.ctx.populate()
+  }
+}
+
+export class CIFlow {
+  constructor(public ctx: Context = new Context()) {}
+
+  async main(): Promise<void> {
+    await this.ctx.populate()
+    switch (this.ctx.ciflow_role) {
+      case 'dispatcher':
+        new CIFlowDispatcher(this.ctx).main()
+        break
+      case 'listener':
+        new CIFlowListener(this.ctx).main()
+        break
+      default:
+        throw new Error(`unsupported ciflow role ${this.ctx.ciflow_role}`)
     }
   }
 }
