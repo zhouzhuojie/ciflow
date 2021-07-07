@@ -1,5 +1,6 @@
 import * as core from '@actions/core'
 import {context, getOctokit} from '@actions/github'
+import * as micromatch from 'micromatch'
 
 export class PlanDiff {
   constructor(
@@ -72,13 +73,14 @@ export class Context {
   private populated = false
 
   public actor = ''
+  public allowed_branch = ''
   public ciflow_role = ''
   public comment_body_fixture = ''
   public comment_head_fixture = ''
   public event_name = ''
   public github!: ReturnType<typeof getOctokit>
-  public github_pat!: ReturnType<typeof getOctokit>
   public github_head_ref = ''
+  public github_pat!: ReturnType<typeof getOctokit>
   public github_sha = ''
   public owner = ''
   public pull_number = 0
@@ -99,6 +101,7 @@ export class Context {
     this.github_pat = getOctokit(core.getInput('pat-token', {required: true}))
     this.strategy = core.getInput('strategy')
     this.actor = context.actor
+    this.allowed_branch = core.getInput('branch', {required: true})
     this.ciflow_role = core.getInput('role', {required: true})
     this.event_name = context.eventName
     this.comment_head_fixture = core.getInput('comment-head-fixture', {
@@ -277,6 +280,13 @@ export class CIFlow {
 
   async main(): Promise<void> {
     await this.ctx.populate()
+
+    if (
+      !micromatch.isMatch(this.ctx.github_head_ref, this.ctx.allowed_branch)
+    ) {
+      return
+    }
+
     switch (this.ctx.ciflow_role) {
       case 'dispatcher':
         new CIFlowDispatcher(this.ctx).main()
