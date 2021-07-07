@@ -39,10 +39,9 @@ inputs:
   github-token:
     description: The GitHub token used to create an authenticated client
     default: ${{ github.token }}
-    required: false
+    required: true
   pat-token:
     description: The GitHub pat token used to trigger additional workflows
-    default: ${{ secrets.PAT }}
     required: true
 outputs:
   result:
