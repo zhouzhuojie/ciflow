@@ -5951,91 +5951,34 @@ var github = __webpack_require__(438);
 // CONCATENATED MODULE: ./src/ciflow.ts
 
 
-// Context is the context to determine which workflows to dispatch
-class ciflow_Context {
-    constructor() {
-        this.repository = '';
-        this.owner = '';
-        this.repo = '';
-        this.comment_head = '';
-        this.comment_body = '';
-        this.branch = '';
-        this.pull_number = 0;
-        this.commit_sha = '';
-        this.strategy = '';
-        this.actor = '';
-    }
-    async populate() {
-        this.repository = Object(core.getInput)('repository', { required: true });
-        const [owner, repo] = this.repository.split('/');
-        this.owner = owner;
-        this.repo = repo;
-        this.github = Object(github.getOctokit)(Object(core.getInput)('github-token', { required: true }));
-        this.comment_head = Object(core.getInput)('comment-head', { required: true });
-        this.comment_body = Object(core.getInput)('comment-body', { required: true });
-        this.strategy = Object(core.getInput)('strategy');
-        this.actor = github.context.actor;
-        // only populate pull_request related
-        if (github.context.payload.issue) {
-            this.pull_number = github.context.payload.issue.number;
-            const pr = await this.github.pulls.get({
-                owner: this.owner,
-                repo: this.repo,
-                pull_number: this.pull_number
-            });
-            this.branch = pr.data.head.ref;
-            this.commit_sha = pr.data.head.sha;
-        }
-        Object(core.debug)(JSON.stringify(this));
+class PlanDiff {
+    constructor(added_labels = new Array(), added_workflows = new Array(), deleted_labels = new Array(), deleted_workflows = new Array()) {
+        this.added_labels = added_labels;
+        this.added_workflows = added_workflows;
+        this.deleted_labels = deleted_labels;
+        this.deleted_workflows = deleted_workflows;
     }
 }
-class ciflow_Workflow {
-    constructor(workflow_id = '') {
-        this.workflow_id = workflow_id;
-    }
-    async rerun(ctx) {
-        var _a;
-        const runs = await ctx.github.actions.listWorkflowRuns({
-            owner: ctx.owner,
-            repo: ctx.repo,
-            branch: ctx.branch,
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-expect-error workflow_id can be a string from github rest api
-            workflow_id: this.workflow_id
-        });
-        // if we found exisiting running workflow, only rerun after checking the
-        // the status of it
-        if (((_a = runs === null || runs === void 0 ? void 0 : runs.data) === null || _a === void 0 ? void 0 : _a.workflow_runs.length) != 0) {
-            const lastRun = runs === null || runs === void 0 ? void 0 : runs.data.workflow_runs[0];
-            Object(core.debug)(JSON.stringify(lastRun));
-            if ((lastRun === null || lastRun === void 0 ? void 0 : lastRun.conclusion) == 'skipped') {
-                ctx.github.actions.reRunWorkflow({
-                    owner: ctx.owner,
-                    repo: ctx.repo,
-                    run_id: lastRun.id
-                });
-                return true;
-            }
-            else {
-                return false;
-            }
-        }
-        return false;
-    }
-}
-class Comment {
+class Plan {
     constructor() {
-        this.id = 0;
-        this.body = '';
         this.label_workflows = new Map();
+        this.labels = new Set();
         this.workflows = new Set();
-        this.rerun_workflows = new Array();
+        this.timestamp = new Date();
     }
-    parse(body) {
+    calculate_diff(pre) {
+        const added_labels = [...this.labels].filter(x => !pre.labels.has(x));
+        const added_workflows = [...this.workflows].filter(x => !pre.workflows.has(x));
+        const deleted_labels = [...pre.labels].filter(x => !this.labels.has(x));
+        const deleted_workflows = [...pre.workflows].filter(x => !this.workflows.has(x));
+        return new PlanDiff(added_labels, added_workflows, deleted_labels, deleted_workflows);
+    }
+    static parse(body) {
         var _a;
+        const label_workflows = new Map();
+        const plan = new Plan();
         const re = new RegExp(/-\s+\[([\s|x])\]\s+(.*)[\r\n]((\s\s-.*yml[\r\n])*)/g);
         let match = re.exec(body);
-        const label_workflows = new Map();
         while (match) {
             const mark = match[1];
             const label = match[2];
@@ -6056,31 +5999,84 @@ class Comment {
                 }
                 for (const wf of w) {
                     (_a = label_workflows.get(label)) === null || _a === void 0 ? void 0 : _a.push(wf);
-                    this.workflows.add(wf);
+                    plan.workflows.add(wf);
                 }
             }
             match = re.exec(body);
         }
-        this.label_workflows = label_workflows;
+        plan.label_workflows = label_workflows;
+        return plan;
+    }
+}
+class ciflow_Context {
+    constructor() {
+        this.populated = false;
+        this.repository = '';
+        this.owner = '';
+        this.repo = '';
+        this.github_head_ref = '';
+        this.pull_number = 0;
+        this.github_sha = '';
+        this.strategy = '';
+        this.actor = '';
+        this.ciflow_role = '';
+        this.comment_body_fixture = '';
+        this.comment_head_fixture = '';
+    }
+    async populate() {
+        if (this.populated) {
+            return;
+        }
+        this.repository = Object(core.getInput)('repository', { required: true });
+        const [owner, repo] = this.repository.split('/');
+        this.owner = owner;
+        this.repo = repo;
+        this.github = Object(github.getOctokit)(Object(core.getInput)('github-token', { required: true }));
+        this.strategy = Object(core.getInput)('strategy');
+        this.actor = github.context.actor;
+        this.ciflow_role = Object(core.getInput)('role', { required: true });
+        this.comment_head_fixture = Object(core.getInput)('comment-head-fixture', {
+            required: true
+        });
+        this.comment_body_fixture = Object(core.getInput)('comment-body-fixture', {
+            required: true
+        });
+        // only populate pull_request related
+        if (github.context.payload.issue) {
+            this.pull_number = github.context.payload.issue.number;
+            this.github_head_ref = process.env.GITHUB_HEAD_REF || '';
+            this.github_sha = process.env.GITHUB_SHA || '';
+        }
+        this.populated = true;
+        Object(core.debug)(JSON.stringify(this));
+    }
+}
+class ciflow_Comment {
+    constructor() {
+        this.id = 0;
+        this.curr_body = '';
+        this.curr_plan = new Plan();
+        this.pre_body = '';
+        this.pre_plan = new Plan();
     }
     async update(ctx) {
         ctx.github.issues.updateComment({
             owner: ctx.owner,
             repo: ctx.repo,
             comment_id: this.id,
-            body: this.body +
+            body: this.curr_body +
                 '\n----\n' +
                 '```json\n' +
                 JSON.stringify({
                     actor: ctx.actor,
                     timestamp: new Date(),
-                    label_workflows: this.label_workflows,
-                    rerun_workflows: this.rerun_workflows
+                    plan_diff: this.curr_plan.calculate_diff(this.pre_plan)
                 }, null, 2) +
                 '\n```\n'
         });
     }
-    async find(ctx) {
+    async populate(ctx) {
+        var _a;
         if (!ctx.pull_number) {
             return false;
         }
@@ -6092,11 +6088,14 @@ class Comment {
         for await (const { data: comments } of ctx.github.paginate.iterator(ctx.github.issues.listComments, parameters)) {
             // Search each page for the comment
             const comment = comments.find(comment => {
-                return comment.body.includes(ctx.comment_head);
+                return comment.body.includes(ctx.comment_head_fixture);
             });
             if (comment) {
                 this.id = comment.id;
-                this.body = comment.body;
+                this.curr_body = comment.body;
+                this.curr_plan = Plan.parse(this.curr_body);
+                this.pre_body = (_a = github.context.payload.comment) === null || _a === void 0 ? void 0 : _a.body.from;
+                this.pre_plan = Plan.parse(this.pre_body);
                 return true;
             }
         }
@@ -6106,47 +6105,53 @@ class Comment {
         if (!ctx.pull_number) {
             return;
         }
-        ctx.github.issues.createComment({
+        const c = await ctx.github.issues.createComment({
             owner: ctx.owner,
             repo: ctx.repo,
             issue_number: ctx.pull_number,
-            body: ctx.comment_head + '\n' + ctx.comment_body
+            body: ctx.comment_head_fixture + '\n' + ctx.comment_body_fixture
         });
+        this.id = c.data.id;
+        this.curr_body = c.data.body;
+        this.curr_plan = Plan.parse(this.curr_body);
     }
     async dispatch(ctx) {
-        this.parse(this.body);
+        if (!ctx.pull_number) {
+            return;
+        }
+        const labels = this.curr_plan.calculate_diff(this.pre_plan).added_labels;
         await ctx.github.issues.addLabels({
             owner: ctx.owner,
             repo: ctx.repo,
             issue_number: ctx.pull_number,
-            labels: [...this.label_workflows.keys()]
+            labels: labels
         });
-        for (const wf of this.workflows) {
-            const workflow = new ciflow_Workflow(wf);
-            const rerun = await workflow.rerun(ctx);
-            if (rerun) {
-                this.rerun_workflows.push(wf);
-            }
-        }
+        await Promise.all(labels.map(label => ctx.github.issues.removeLabel({
+            owner: ctx.owner,
+            repo: ctx.repo,
+            issue_number: ctx.pull_number,
+            name: label
+        })));
         await this.update(ctx);
     }
 }
-class ciflow_CIFlow {
-    constructor() {
-        this.ctx = new ciflow_Context();
+class ciflow_CIFlowDispatcher {
+    constructor(ctx = new ciflow_Context()) {
+        this.ctx = ctx;
     }
     async dispatch_comment() {
         var _a;
-        const comment = new Comment();
-        const found = await comment.find(this.ctx);
+        const comment = new ciflow_Comment();
+        const found = await comment.populate(this.ctx);
         if (!found) {
-            comment.create(this.ctx);
+            await comment.create(this.ctx);
+            await comment.dispatch(this.ctx);
             return;
         }
         if (((_a = github.context.payload.comment) === null || _a === void 0 ? void 0 : _a.id) != comment.id) {
             return;
         }
-        comment.dispatch(this.ctx);
+        await comment.dispatch(this.ctx);
     }
     async main() {
         await this.ctx.populate();
@@ -6161,6 +6166,32 @@ class ciflow_CIFlow {
         }
     }
 }
+class CIFlowListener {
+    constructor(ctx = new ciflow_Context()) {
+        this.ctx = ctx;
+    }
+    async main() {
+        await this.ctx.populate();
+    }
+}
+class CIFlow {
+    constructor(ctx = new ciflow_Context()) {
+        this.ctx = ctx;
+    }
+    async main() {
+        await this.ctx.populate();
+        switch (this.ctx.ciflow_role) {
+            case 'dispatcher':
+                new ciflow_CIFlowDispatcher(this.ctx).main();
+                break;
+            case 'listener':
+                new CIFlowListener(this.ctx).main();
+                break;
+            default:
+                throw new Error(`unsupported ciflow role ${this.ctx.ciflow_role}`);
+        }
+    }
+}
 
 // CONCATENATED MODULE: ./src/main.ts
 
@@ -6168,7 +6199,7 @@ class ciflow_CIFlow {
 process.on('unhandledRejection', handleError);
 main().catch(handleError);
 async function main() {
-    new ciflow_CIFlow().main();
+    new CIFlow().main();
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function handleError(err) {
