@@ -12,16 +12,16 @@ inputs:
   comment-body-fixture:
     description: The ciflow comment body
     default: |
-      - [x] ci/default
+      - [x] #default
         - ciflow_lint.yml
         - ciflow_linux.yml
         - ciflow_windows.yml
         - ciflow_mac.yml
-      - [ ] ci/extra
+      - [ ] #extra
         - ciflow_linux_extra.yml
         - ciflow_windows_extra.yml
         - ciflow_mac_extra.yml
-      - [ ] ci/cuda
+      - [ ] #cuda
         - ciflow_windows_cuda.yml
     required: false
   strategy:

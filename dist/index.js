@@ -5952,26 +5952,26 @@ var github = __webpack_require__(438);
 
 
 class PlanDiff {
-    constructor(added_labels = new Array(), added_workflows = new Array(), deleted_labels = new Array(), deleted_workflows = new Array()) {
-        this.added_labels = added_labels;
+    constructor(added_tags = new Array(), added_workflows = new Array(), deleted_tags = new Array(), deleted_workflows = new Array()) {
+        this.added_tags = added_tags;
         this.added_workflows = added_workflows;
-        this.deleted_labels = deleted_labels;
+        this.deleted_tags = deleted_tags;
         this.deleted_workflows = deleted_workflows;
     }
 }
 class Plan {
     constructor() {
-        this.label_workflows = new Map();
-        this.labels = new Set();
+        this.tag_workflows = new Map();
+        this.tags = new Set();
         this.workflows = new Set();
         this.timestamp = new Date();
     }
     calculate_diff(pre) {
-        const added_labels = [...this.labels].filter(x => !pre.labels.has(x));
+        const added_tags = [...this.tags].filter(x => !pre.tags.has(x));
         const added_workflows = [...this.workflows].filter(x => !pre.workflows.has(x));
-        const deleted_labels = [...pre.labels].filter(x => !this.labels.has(x));
+        const deleted_tags = [...pre.tags].filter(x => !this.tags.has(x));
         const deleted_workflows = [...pre.workflows].filter(x => !this.workflows.has(x));
-        return new PlanDiff(added_labels, added_workflows, deleted_labels, deleted_workflows);
+        return new PlanDiff(added_tags, added_workflows, deleted_tags, deleted_workflows);
     }
     static parse(body) {
         var _a;
@@ -5980,7 +5980,7 @@ class Plan {
         let match = re.exec(body);
         while (match) {
             const mark = match[1];
-            const label = match[2];
+            const tag = match[2];
             const w = match[3]
                 .split('\n')
                 .map(x => {
@@ -5993,12 +5993,12 @@ class Plan {
             })
                 .filter(item => item != '');
             if (mark == 'x') {
-                if (!plan.label_workflows.has(label)) {
-                    plan.label_workflows.set(label, new Array());
-                    plan.labels.add(label);
+                if (!plan.tag_workflows.has(tag)) {
+                    plan.tag_workflows.set(tag, new Array());
+                    plan.tags.add(tag);
                 }
                 for (const wf of w) {
-                    (_a = plan.label_workflows.get(label)) === null || _a === void 0 ? void 0 : _a.push(wf);
+                    (_a = plan.tag_workflows.get(tag)) === null || _a === void 0 ? void 0 : _a.push(wf);
                     plan.workflows.add(wf);
                 }
             }
@@ -6080,7 +6080,6 @@ class ciflow_Comment {
         });
     }
     async populate(ctx) {
-        var _a;
         if (!ctx.pull_number) {
             return false;
         }
@@ -6098,7 +6097,7 @@ class ciflow_Comment {
                 this.id = comment.id;
                 this.curr_body = comment.body;
                 this.curr_plan = Plan.parse(this.curr_body);
-                this.pre_body = (_a = github.context.payload.comment) === null || _a === void 0 ? void 0 : _a.body.from;
+                this.pre_body = github.context.payload.changes.body.from;
                 this.pre_plan = Plan.parse(this.pre_body);
                 return true;
             }
@@ -6123,31 +6122,30 @@ class ciflow_Comment {
         if (!ctx.pull_number) {
             return;
         }
-        let labels;
+        let tags;
         if (ctx.event_name == 'issue_comment') {
-            labels = this.curr_plan.calculate_diff(this.pre_plan).added_labels;
+            tags = this.curr_plan.calculate_diff(this.pre_plan).added_tags;
         }
         else {
-            labels = [...this.curr_plan.labels];
+            tags = [...this.curr_plan.tags];
         }
         Object(core.debug)('Comment.dispatch - this');
         Object(core.debug)(JSON.stringify(this));
-        Object(core.debug)('Comment.dispatch - labels');
-        Object(core.debug)(JSON.stringify(labels));
+        Object(core.debug)('Comment.dispatch - tags');
+        Object(core.debug)(JSON.stringify(tags));
+        const label = `ciflow:${tags.join('')}`;
         await ctx.github.issues.addLabels({
             owner: ctx.owner,
             repo: ctx.repo,
             issue_number: ctx.pull_number,
-            labels: labels
+            labels: [label]
         });
-        await Promise.all(labels.map(label => 
-        // we use github_pat because indeed we want the unlabeled event to trigger other workflows
-        ctx.github_pat.issues.removeLabel({
+        await ctx.github_pat.issues.removeLabel({
             owner: ctx.owner,
             repo: ctx.repo,
             issue_number: ctx.pull_number,
             name: label
-        })));
+        });
         await this.update(ctx);
     }
 }

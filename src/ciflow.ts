@@ -3,32 +3,32 @@ import {context, getOctokit} from '@actions/github'
 
 export class PlanDiff {
   constructor(
-    public added_labels = new Array<string>(),
+    public added_tags = new Array<string>(),
     public added_workflows = new Array<string>(),
-    public deleted_labels = new Array<string>(),
+    public deleted_tags = new Array<string>(),
     public deleted_workflows = new Array<string>()
   ) {}
 }
 
 export class Plan {
-  public label_workflows = new Map<string, Array<string>>()
-  public labels = new Set<string>()
+  public tag_workflows = new Map<string, Array<string>>()
+  public tags = new Set<string>()
   public workflows = new Set<string>()
   public timestamp = new Date()
 
   calculate_diff(pre: Plan): PlanDiff {
-    const added_labels = [...this.labels].filter(x => !pre.labels.has(x))
+    const added_tags = [...this.tags].filter(x => !pre.tags.has(x))
     const added_workflows = [...this.workflows].filter(
       x => !pre.workflows.has(x)
     )
-    const deleted_labels = [...pre.labels].filter(x => !this.labels.has(x))
+    const deleted_tags = [...pre.tags].filter(x => !this.tags.has(x))
     const deleted_workflows = [...pre.workflows].filter(
       x => !this.workflows.has(x)
     )
     return new PlanDiff(
-      added_labels,
+      added_tags,
       added_workflows,
-      deleted_labels,
+      deleted_tags,
       deleted_workflows
     )
   }
@@ -39,7 +39,7 @@ export class Plan {
     let match = re.exec(body)
     while (match) {
       const mark = match[1]
-      const label = match[2]
+      const tag = match[2]
       const w = match[3]
         .split('\n')
         .map(x => {
@@ -53,12 +53,12 @@ export class Plan {
         .filter(item => item != '')
 
       if (mark == 'x') {
-        if (!plan.label_workflows.has(label)) {
-          plan.label_workflows.set(label, new Array<string>())
-          plan.labels.add(label)
+        if (!plan.tag_workflows.has(tag)) {
+          plan.tag_workflows.set(tag, new Array<string>())
+          plan.tags.add(tag)
         }
         for (const wf of w) {
-          plan.label_workflows.get(label)?.push(wf)
+          plan.tag_workflows.get(tag)?.push(wf)
           plan.workflows.add(wf)
         }
       }
@@ -175,7 +175,7 @@ export class Comment {
         this.id = comment.id
         this.curr_body = comment.body
         this.curr_plan = Plan.parse(this.curr_body)
-        this.pre_body = context.payload.comment?.body.from
+        this.pre_body = context.payload.changes.body.from
         this.pre_plan = Plan.parse(this.pre_body)
         return true
       }
@@ -205,36 +205,33 @@ export class Comment {
       return
     }
 
-    let labels: Array<string>
+    let tags: Array<string>
     if (ctx.event_name == 'issue_comment') {
-      labels = this.curr_plan.calculate_diff(this.pre_plan).added_labels
+      tags = this.curr_plan.calculate_diff(this.pre_plan).added_tags
     } else {
-      labels = [...this.curr_plan.labels]
+      tags = [...this.curr_plan.tags]
     }
 
     core.debug('Comment.dispatch - this')
     core.debug(JSON.stringify(this))
-    core.debug('Comment.dispatch - labels')
-    core.debug(JSON.stringify(labels))
+    core.debug('Comment.dispatch - tags')
+    core.debug(JSON.stringify(tags))
+
+    const label = `ciflow:${tags.join('')}`
 
     await ctx.github.issues.addLabels({
       owner: ctx.owner,
       repo: ctx.repo,
       issue_number: ctx.pull_number,
-      labels: labels
+      labels: [label]
     })
 
-    await Promise.all(
-      labels.map(label =>
-        // we use github_pat because indeed we want the unlabeled event to trigger other workflows
-        ctx.github_pat.issues.removeLabel({
-          owner: ctx.owner,
-          repo: ctx.repo,
-          issue_number: ctx.pull_number,
-          name: label
-        })
-      )
-    )
+    await ctx.github_pat.issues.removeLabel({
+      owner: ctx.owner,
+      repo: ctx.repo,
+      issue_number: ctx.pull_number,
+      name: label
+    })
 
     await this.update(ctx)
   }

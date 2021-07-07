@@ -20,7 +20,7 @@ describe('Plan', () => {
     `
 
     const plan = Plan.parse(body)
-    expect([...plan.label_workflows.keys()]).toEqual(['ci/default'])
+    expect([...plan.tag_workflows.keys()]).toEqual(['ci/default'])
     expect(plan.workflows).toEqual(
       new Set<string>([
         'ciflow_lint.yml',
@@ -29,20 +29,20 @@ describe('Plan', () => {
         'ciflow_mac.yml'
       ])
     )
-    expect(plan.calculate_diff(new Plan()).added_labels).toEqual(['ci/default'])
+    expect(plan.calculate_diff(new Plan()).added_tags).toEqual(['ci/default'])
   })
 
   test('parse empty body', () => {
     const body = ''
     const plan = Plan.parse(body)
-    expect([...plan.label_workflows.keys()]).toEqual([])
+    expect([...plan.tag_workflows.keys()]).toEqual([])
     expect(plan.workflows).toEqual(new Set<string>())
   })
 
   test('parse empty body with header', () => {
     const body = `# 📚 ciflow test plan!\n`
     const plan = Plan.parse(body)
-    expect([...plan.label_workflows.keys()]).toEqual([])
+    expect([...plan.tag_workflows.keys()]).toEqual([])
     expect(plan.workflows).toEqual(new Set<string>())
   })
 })
