@@ -73,20 +73,19 @@ export class Plan {
 export class Context {
   private populated = false
 
-  public repository = ''
-  public owner = ''
-  public repo = ''
-  public github_head_ref = ''
-  public pull_number = 0
-  public github_sha = ''
-  public strategy = ''
   public actor = ''
   public ciflow_role = ''
-
   public comment_body_fixture = ''
   public comment_head_fixture = ''
-
+  public event_name = ''
   public github!: ReturnType<typeof getOctokit>
+  public github_head_ref = ''
+  public github_sha = ''
+  public owner = ''
+  public pull_number = 0
+  public repo = ''
+  public repository = ''
+  public strategy = ''
 
   async populate(): Promise<void> {
     if (this.populated) {
@@ -101,6 +100,7 @@ export class Context {
     this.strategy = core.getInput('strategy')
     this.actor = context.actor
     this.ciflow_role = core.getInput('role', {required: true})
+    this.event_name = context.eventName
     this.comment_head_fixture = core.getInput('comment-head-fixture', {
       required: true
     })
@@ -202,7 +202,12 @@ export class Comment {
       return
     }
 
-    const labels = this.curr_plan.calculate_diff(this.pre_plan).added_labels
+    let labels: Array<string>
+    if (ctx.event_name == 'issue_comment') {
+      labels = this.curr_plan.calculate_diff(this.pre_plan).added_labels
+    } else {
+      labels = [...this.curr_plan.labels]
+    }
 
     await ctx.github.issues.addLabels({
       owner: ctx.owner,

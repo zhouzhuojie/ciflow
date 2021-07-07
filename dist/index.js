@@ -6011,17 +6011,18 @@ class Plan {
 class ciflow_Context {
     constructor() {
         this.populated = false;
-        this.repository = '';
-        this.owner = '';
-        this.repo = '';
-        this.github_head_ref = '';
-        this.pull_number = 0;
-        this.github_sha = '';
-        this.strategy = '';
         this.actor = '';
         this.ciflow_role = '';
         this.comment_body_fixture = '';
         this.comment_head_fixture = '';
+        this.event_name = '';
+        this.github_head_ref = '';
+        this.github_sha = '';
+        this.owner = '';
+        this.pull_number = 0;
+        this.repo = '';
+        this.repository = '';
+        this.strategy = '';
     }
     async populate() {
         if (this.populated) {
@@ -6035,6 +6036,7 @@ class ciflow_Context {
         this.strategy = Object(core.getInput)('strategy');
         this.actor = github.context.actor;
         this.ciflow_role = Object(core.getInput)('role', { required: true });
+        this.event_name = github.context.eventName;
         this.comment_head_fixture = Object(core.getInput)('comment-head-fixture', {
             required: true
         });
@@ -6119,7 +6121,13 @@ class ciflow_Comment {
         if (!ctx.pull_number) {
             return;
         }
-        const labels = this.curr_plan.calculate_diff(this.pre_plan).added_labels;
+        let labels;
+        if (ctx.event_name == 'issue_comment') {
+            labels = this.curr_plan.calculate_diff(this.pre_plan).added_labels;
+        }
+        else {
+            labels = [...this.curr_plan.labels];
+        }
         await ctx.github.issues.addLabels({
             owner: ctx.owner,
             repo: ctx.repo,
