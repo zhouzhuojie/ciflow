@@ -5,11 +5,11 @@ branding:
   color: blue
   icon: code
 inputs:
-  comment-head:
+  comment-head-fixture:
     description: The ciflow comment head, used for identifying the comment block
     default: '# 📚 CIFlow Test Plan'
     required: true
-  comment-body:
+  comment-body-fixture:
     description: The ciflow comment body
     default: |
       - [x] ci/default
