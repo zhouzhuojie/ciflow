@@ -81,7 +81,6 @@ export class Context {
   public github!: ReturnType<typeof getOctokit>
   public github_head_ref = ''
   public github_pat!: ReturnType<typeof getOctokit>
-  public github_sha = ''
   public owner = ''
   public pull_number = 0
   public repo = ''
@@ -115,8 +114,12 @@ export class Context {
     const pr = context.payload.issue || context.payload.pull_request
     if (pr) {
       this.pull_number = pr.number
-      this.github_head_ref = process.env.GITHUB_HEAD_REF || ''
-      this.github_sha = process.env.GITHUB_SHA || ''
+      const prResp = await this.github.pulls.get({
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: this.pull_number
+      })
+      this.github_head_ref = prResp.data.head.ref
     }
 
     this.populated = true

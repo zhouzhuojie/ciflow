@@ -10116,7 +10116,6 @@ class ciflow_Context {
         this.comment_head_fixture = '';
         this.event_name = '';
         this.github_head_ref = '';
-        this.github_sha = '';
         this.owner = '';
         this.pull_number = 0;
         this.repo = '';
@@ -10148,8 +10147,12 @@ class ciflow_Context {
         const pr = github.context.payload.issue || github.context.payload.pull_request;
         if (pr) {
             this.pull_number = pr.number;
-            this.github_head_ref = process.env.GITHUB_HEAD_REF || '';
-            this.github_sha = process.env.GITHUB_SHA || '';
+            const prResp = await this.github.pulls.get({
+                owner: this.owner,
+                repo: this.repo,
+                pull_number: this.pull_number
+            });
+            this.github_head_ref = prResp.data.head.ref;
         }
         this.populated = true;
         Object(core.debug)('Context.populate - this');
