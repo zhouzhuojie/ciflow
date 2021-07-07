@@ -42,6 +42,7 @@ inputs:
     required: true
   pat-token:
     description: The GitHub pat token used to trigger additional workflows
+    default: ${{ github.token }}
     required: true
 outputs:
   result:
