@@ -6123,13 +6123,7 @@ class ciflow_Comment {
         if (!ctx.pull_number) {
             return;
         }
-        let tags;
-        if (ctx.event_name == 'issue_comment') {
-            tags = this.curr_plan.calculate_diff(this.pre_plan).added_tags;
-        }
-        else {
-            tags = [...this.curr_plan.tags];
-        }
+        const tags = [...this.curr_plan.tags];
         Object(core.debug)('Comment.dispatch - this');
         Object(core.debug)(JSON.stringify(this));
         Object(core.debug)('Comment.dispatch - tags');

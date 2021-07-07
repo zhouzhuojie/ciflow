@@ -205,12 +205,7 @@ export class Comment {
       return
     }
 
-    let tags: Array<string>
-    if (ctx.event_name == 'issue_comment') {
-      tags = this.curr_plan.calculate_diff(this.pre_plan).added_tags
-    } else {
-      tags = [...this.curr_plan.tags]
-    }
+    const tags = [...this.curr_plan.tags]
 
     core.debug('Comment.dispatch - this')
     core.debug(JSON.stringify(this))
