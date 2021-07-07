@@ -6080,6 +6080,7 @@ class ciflow_Comment {
         });
     }
     async populate(ctx) {
+        var _a, _b;
         if (!ctx.pull_number) {
             return false;
         }
@@ -6097,7 +6098,7 @@ class ciflow_Comment {
                 this.id = comment.id;
                 this.curr_body = comment.body;
                 this.curr_plan = Plan.parse(this.curr_body);
-                this.pre_body = github.context.payload.changes.body.from;
+                this.pre_body = (_b = (_a = github.context.payload.changes) === null || _a === void 0 ? void 0 : _a.body) === null || _b === void 0 ? void 0 : _b.from;
                 this.pre_plan = Plan.parse(this.pre_body);
                 return true;
             }

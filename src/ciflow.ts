@@ -175,7 +175,7 @@ export class Comment {
         this.id = comment.id
         this.curr_body = comment.body
         this.curr_plan = Plan.parse(this.curr_body)
-        this.pre_body = context.payload.changes.body.from
+        this.pre_body = context.payload.changes?.body?.from
         this.pre_plan = Plan.parse(this.pre_body)
         return true
       }
