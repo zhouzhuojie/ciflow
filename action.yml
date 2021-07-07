@@ -8,7 +8,7 @@ inputs:
   comment-head-fixture:
     description: The ciflow comment head, used for identifying the comment block
     default: '# 📚 CIFlow Test Plan'
-    required: true
+    required: false
   comment-body-fixture:
     description: The ciflow comment body
     default: |
@@ -23,7 +23,7 @@ inputs:
         - ciflow_mac_extra.yml
       - [ ] ci/cuda
         - ciflow_windows_cuda.yml
-    required: true
+    required: false
   strategy:
     description: The dispatcher strategy.
     default: comment
@@ -31,7 +31,7 @@ inputs:
   role:
     description: The role of the CIFlow. 'dispatcher' | 'listener'
     default: dispatcher
-    required: true
+    required: false
   repository:
     description: The GitHub repository, e.g. 'pytorch/pytorch'
     default: ${{ github.repository }}
@@ -39,11 +39,11 @@ inputs:
   github-token:
     description: The GitHub token used to create an authenticated client
     default: ${{ github.token }}
-    required: true
+    required: false
   pat-token:
     description: The GitHub pat token used to trigger additional workflows
     default: ${{ github.token }}
-    required: true
+    required: false
 outputs:
   result:
     description: The return value of the script, stringified with `JSON.stringify`
