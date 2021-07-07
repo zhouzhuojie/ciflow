@@ -77,6 +77,7 @@ export class Context {
   public comment_head_fixture = ''
   public event_name = ''
   public github!: ReturnType<typeof getOctokit>
+  public github_pat!: ReturnType<typeof getOctokit>
   public github_head_ref = ''
   public github_sha = ''
   public owner = ''
@@ -95,6 +96,7 @@ export class Context {
     this.owner = owner
     this.repo = repo
     this.github = getOctokit(core.getInput('github-token', {required: true}))
+    this.github_pat = getOctokit(core.getInput('pat-token', {required: true}))
     this.strategy = core.getInput('strategy')
     this.actor = context.actor
     this.ciflow_role = core.getInput('role', {required: true})
@@ -224,7 +226,8 @@ export class Comment {
 
     await Promise.all(
       labels.map(label =>
-        ctx.github.issues.removeLabel({
+        // we use github_pat because indeed we want the unlabeled event to trigger other workflows
+        ctx.github_pat.issues.removeLabel({
           owner: ctx.owner,
           repo: ctx.repo,
           issue_number: ctx.pull_number,

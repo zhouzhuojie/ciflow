@@ -6032,6 +6032,7 @@ class ciflow_Context {
         this.owner = owner;
         this.repo = repo;
         this.github = Object(github.getOctokit)(Object(core.getInput)('github-token', { required: true }));
+        this.github_pat = Object(github.getOctokit)(Object(core.getInput)('pat-token', { required: true }));
         this.strategy = Object(core.getInput)('strategy');
         this.actor = github.context.actor;
         this.ciflow_role = Object(core.getInput)('role', { required: true });
@@ -6139,7 +6140,9 @@ class ciflow_Comment {
             issue_number: ctx.pull_number,
             labels: labels
         });
-        await Promise.all(labels.map(label => ctx.github.issues.removeLabel({
+        await Promise.all(labels.map(label => 
+        // we use github_pat because indeed we want the unlabeled event to trigger other workflows
+        ctx.github_pat.issues.removeLabel({
             owner: ctx.owner,
             repo: ctx.repo,
             issue_number: ctx.pull_number,
