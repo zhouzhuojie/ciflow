@@ -6044,8 +6044,9 @@ class ciflow_Context {
             required: true
         });
         // only populate pull_request related
-        if (github.context.payload.issue) {
-            this.pull_number = github.context.payload.issue.number;
+        const pr = github.context.payload.issue || github.context.payload.pull_request;
+        if (pr) {
+            this.pull_number = pr.number;
             this.github_head_ref = process.env.GITHUB_HEAD_REF || '';
             this.github_sha = process.env.GITHUB_SHA || '';
         }

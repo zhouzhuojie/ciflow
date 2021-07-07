@@ -109,8 +109,9 @@ export class Context {
     })
 
     // only populate pull_request related
-    if (context.payload.issue) {
-      this.pull_number = context.payload.issue.number
+    const pr = context.payload.issue || context.payload.pull_request
+    if (pr) {
+      this.pull_number = pr.number
       this.github_head_ref = process.env.GITHUB_HEAD_REF || ''
       this.github_sha = process.env.GITHUB_SHA || ''
     }
