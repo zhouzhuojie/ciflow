@@ -29,6 +29,7 @@ describe('Plan', () => {
         'ciflow_mac.yml'
       ])
     )
+    expect(plan.calculate_diff(new Plan()).added_labels).toEqual(['ci/default'])
   })
 
   test('parse empty body', () => {

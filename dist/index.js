@@ -5975,7 +5975,6 @@ class Plan {
     }
     static parse(body) {
         var _a;
-        const label_workflows = new Map();
         const plan = new Plan();
         const re = new RegExp(/-\s+\[([\s|x])\]\s+(.*)[\r\n]((\s\s-.*yml[\r\n])*)/g);
         let match = re.exec(body);
@@ -5994,17 +5993,17 @@ class Plan {
             })
                 .filter(item => item != '');
             if (mark == 'x') {
-                if (!label_workflows.has(label)) {
-                    label_workflows.set(label, new Array());
+                if (!plan.label_workflows.has(label)) {
+                    plan.label_workflows.set(label, new Array());
+                    plan.labels.add(label);
                 }
                 for (const wf of w) {
-                    (_a = label_workflows.get(label)) === null || _a === void 0 ? void 0 : _a.push(wf);
+                    (_a = plan.label_workflows.get(label)) === null || _a === void 0 ? void 0 : _a.push(wf);
                     plan.workflows.add(wf);
                 }
             }
             match = re.exec(body);
         }
-        plan.label_workflows = label_workflows;
         return plan;
     }
 }
@@ -6051,6 +6050,7 @@ class ciflow_Context {
             this.github_sha = process.env.GITHUB_SHA || '';
         }
         this.populated = true;
+        Object(core.debug)('Context.populate - this');
         Object(core.debug)(JSON.stringify(this));
     }
 }
@@ -6129,6 +6129,10 @@ class ciflow_Comment {
         else {
             labels = [...this.curr_plan.labels];
         }
+        Object(core.debug)('Comment.dispatch - this');
+        Object(core.debug)(JSON.stringify(this));
+        Object(core.debug)('Comment.dispatch - labels');
+        Object(core.debug)(JSON.stringify(labels));
         await ctx.github.issues.addLabels({
             owner: ctx.owner,
             repo: ctx.repo,

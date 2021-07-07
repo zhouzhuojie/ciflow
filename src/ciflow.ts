@@ -34,9 +34,7 @@ export class Plan {
   }
 
   static parse(body: string): Plan {
-    const label_workflows = new Map<string, Array<string>>()
     const plan = new Plan()
-
     const re = new RegExp(/-\s+\[([\s|x])\]\s+(.*)[\r\n]((\s\s-.*yml[\r\n])*)/g)
     let match = re.exec(body)
     while (match) {
@@ -55,18 +53,18 @@ export class Plan {
         .filter(item => item != '')
 
       if (mark == 'x') {
-        if (!label_workflows.has(label)) {
-          label_workflows.set(label, new Array<string>())
+        if (!plan.label_workflows.has(label)) {
+          plan.label_workflows.set(label, new Array<string>())
+          plan.labels.add(label)
         }
         for (const wf of w) {
-          label_workflows.get(label)?.push(wf)
+          plan.label_workflows.get(label)?.push(wf)
           plan.workflows.add(wf)
         }
       }
       match = re.exec(body)
     }
 
-    plan.label_workflows = label_workflows
     return plan
   }
 }
@@ -117,6 +115,8 @@ export class Context {
     }
 
     this.populated = true
+
+    core.debug('Context.populate - this')
     core.debug(JSON.stringify(this))
   }
 }
@@ -209,6 +209,11 @@ export class Comment {
     } else {
       labels = [...this.curr_plan.labels]
     }
+
+    core.debug('Comment.dispatch - this')
+    core.debug(JSON.stringify(this))
+    core.debug('Comment.dispatch - labels')
+    core.debug(JSON.stringify(labels))
 
     await ctx.github.issues.addLabels({
       owner: ctx.owner,
