@@ -19,6 +19,8 @@ jobs:
           path: ~/.npm
           key: ${{runner.os}}-npm-${{hashFiles('**/package-lock.json')}}
           restore-keys: ${{runner.os}}-npm-
+      - run: npm run build
+      - uses: numtide/clean-git-action@v1
       - run: npm ci
       - run: npm run style:check
       - run: npm test
